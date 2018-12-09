@@ -58,6 +58,7 @@ private:
     const std::string i2c_dev_name;
     const uint8_t ccs811_addr;
     int i2c_fd = -1;
+    time_t last_measurement = 0;
     uint16_t co2 = 0;
     uint16_t tvoc = 0;
 

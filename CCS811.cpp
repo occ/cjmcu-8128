@@ -125,6 +125,7 @@ void CCS811::read_sensors() {
     auto data = read_mailbox(ALG_RESULT_DATA);
     co2 = (data->at(0) << 8 | data->at(1));
     tvoc = (data->at(2) << 8 | data->at(3));
+    last_measurement = time(nullptr);
 }
 
 void CCS811::write_data(uint8_t *buffer, size_t buffer_len) {
