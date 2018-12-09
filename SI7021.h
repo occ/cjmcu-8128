@@ -26,9 +26,13 @@ public:
     };
 
     uint8_t get_fw_rev();
+
     float measure_humidity();
+
     float measure_temperature();
+
     uint64_t get_serial();
+
 private:
     const std::string i2c_dev_name;
     const uint8_t ccs811_addr;
@@ -37,13 +41,21 @@ private:
     uint8_t fw_rev = 0;
 
     uint8_t crc(uint8_t in);
+
     void close_device();
+
     void init();
+
     void open_device();
+
     std::unique_ptr<std::vector<uint8_t>> read_data(size_t buffer_size);
+
     void read_fw_rev();
+
     void read_serial();
+
     void reset();
+
     void write_data(uint8_t *buffer, size_t buffer_len);
 };
 
