@@ -27,7 +27,7 @@ SI7021::~SI7021() {
 void SI7021::close_device() { if (i2c_fd >= 0) close(i2c_fd); }
 
 void SI7021::init() {
-    cout << "Resetting..." << endl;
+    cout << "Resetting Si7021..." << endl;
     reset();
     this_thread::sleep_for(chrono::seconds(1));
 
