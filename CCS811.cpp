@@ -33,7 +33,7 @@ void CCS811::init() {
         exit(-1);
     }
 
-    cout << "Resetting..." << endl;
+    cout << "Resetting CCS811..." << endl;
     uint8_t reset_sequence[] = {0x11, 0xe5, 0x72, 0x8a};
     write_to_mailbox(SW_RESET, reset_sequence, 4);
 
@@ -99,16 +99,16 @@ std::unique_ptr<std::vector<uint8_t>> CCS811::read_mailbox(CCS811::Mailbox m) {
 
     auto result = make_unique<vector<uint8_t>>();
 #ifdef DBG
-    cout << "Read: ";
+    cerr << "Read: ";
 #endif
     for (size_t i = 0; i < mbox_info.size; i++) {
         result->push_back(read_buffer[i]);
 #ifdef DBG
-        cout << "0x" << hex << (int)read_buffer[i] << " ";
+        cerr << "0x" << hex << (int)read_buffer[i] << " ";
 #endif
     }
 #ifdef DBG
-    cout << endl;
+    cerr << endl;
 #endif
 
     delete[] read_buffer;
