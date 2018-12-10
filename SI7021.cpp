@@ -11,8 +11,6 @@
 
 #undef DBG
 
-using namespace std;
-
 SI7021::SI7021(std::string i2c_dev_name, uint8_t ccs811_addr)
         : i2c_dev_name(std::move(i2c_dev_name)),
           ccs811_addr(ccs811_addr) {
@@ -27,9 +25,9 @@ SI7021::~SI7021() {
 void SI7021::close_device() { if (i2c_fd >= 0) close(i2c_fd); }
 
 void SI7021::init() {
-    cout << "Resetting Si7021..." << endl;
+    std::cout << "Resetting Si7021..." << std::endl;
     reset();
-    this_thread::sleep_for(chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     read_serial();
     read_fw_rev();
@@ -38,12 +36,12 @@ void SI7021::init() {
 void SI7021::open_device() {
     i2c_fd = open(i2c_dev_name.c_str(), O_RDWR);
     if (i2c_fd < 0) {
-        cerr << "Unable to open" << i2c_dev_name << ". " << strerror(errno) << endl;
+        std::cerr << "Unable to open" << i2c_dev_name << ". " << strerror(errno) << std::endl;
         throw 1;
     }
 
     if (ioctl(i2c_fd, I2C_SLAVE, ccs811_addr) < 0) {
-        cerr << "Failed to communicate with the device. " << strerror(errno) << endl;
+        std::cerr << "Failed to communicate with the device. " << strerror(errno) << std::endl;
         throw 1;
     }
 }
@@ -55,21 +53,21 @@ uint64_t SI7021::get_serial() {
 
 void SI7021::write_data(uint8_t *buffer, size_t buffer_len) {
 #ifdef DBG
-    cout << "Write: ";
-    for (size_t i = 0; i < buffer_len; i++) {
-        cout << "0x" << hex << (int) buffer[i] << " ";
-    }
-    cout << endl;
+    std::cout << "Write: ";
+     for (size_t i = 0; i < buffer_len; i++) {
+        std::cout << "0x" << hex << (int) buffer[i] << " ";
+     }
+    std::cout << std::endl;
 #endif
 
     auto write_c = write(i2c_fd, buffer, buffer_len);
     if (write_c < 0) {
-        cerr << "Unable to send command." << endl;
+        std::cerr << "Unable to send command." << std::endl;
         // TODO - Have better exceptions.
         throw 1;
     }
 #ifdef DBG
-    cout << "  ... wrote " << write_c << " bytes." << endl;
+    std::cout << "  ... wrote " << write_c << " bytes." << std::endl;
 #endif
 }
 
@@ -78,7 +76,7 @@ std::unique_ptr<std::vector<uint8_t>> SI7021::read_data(size_t buffer_size) {
     auto bytes_read = read(i2c_fd, read_buffer, buffer_size);
 
 #ifdef DBG
-    cout << "Read " << std::dec << bytes_read << " bytes" << endl;
+    std::cout << "Read " << std::dec << bytes_read << " bytes" << std::endl;
 #endif
     if (bytes_read < 0) {
         // return an empty vector if we can't read anything.
@@ -152,7 +150,7 @@ uint8_t SI7021::get_fw_rev() {
 float SI7021::measure_humidity() {
     uint8_t cmd[] = {MEAS_REL_HUM};
     write_data(cmd, 1);
-    this_thread::sleep_for(chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     auto response = read_data(2);
     if (response->empty()) return 0;
@@ -163,7 +161,7 @@ float SI7021::measure_humidity() {
 float SI7021::measure_temperature() {
     uint8_t cmd[] = {MEAS_TEMP};
     write_data(cmd, 1);
-    this_thread::sleep_for(chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     auto response = read_data(2);
     if (response->empty()) return 0;

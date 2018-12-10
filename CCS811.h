@@ -10,8 +10,6 @@
 #include <iostream>
 #include <thread>
 
-using namespace std;
-
 // CCS811 interface per specifications in
 // https://cdn.sparkfun.com/assets/learn_tutorials/1/4/3/CCS811_Datasheet-DS000459.pdf
 class CCS811 {

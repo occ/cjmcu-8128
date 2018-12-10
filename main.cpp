@@ -19,15 +19,15 @@ int main() {
 
         std::cout << "T: " << std::fixed << std::setprecision(3) << temp;
         std::cout << "\tH: " << std::fixed << std::setprecision(3) << hum;
-        std::cout << "\tC: " << dec << co2;
-        std::cout << "\tO: " << dec << tvoc << endl;
+        std::cout << "\tC: " << std::dec << co2;
+        std::cout << "\tO: " << std::dec << tvoc << std::endl;
 
         s3.measure();
         auto t2 = s3.get_temperature();
         auto pres = s3.get_temperature();
 
-        std::cout << "T2: " << dec << t2 << "\tP: " << pres << std::endl;
+        std::cout << "T2: " << std::dec << t2 << "\tP: " << pres << std::endl;
 
-        this_thread::sleep_for(chrono::seconds(2));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
     }
 }
