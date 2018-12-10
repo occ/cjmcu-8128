@@ -17,7 +17,7 @@ int main() {
         std::cout << "\tT(BMP280): " << std::fixed << std::setprecision(2) << bmp280.get_temperature() << "°C";
         std::cout << "\tRH: " << std::fixed << std::setprecision(2) << si7021.measure_humidity() << "%";
         std::cout << "\tCO2: " << std::dec << ccs811.get_co2() << "ppm";
-        std::cout << "\tOC: " << std::dec << ccs811.get_tvoc() << "ppm";
+        std::cout << "\tTVOC: " << std::dec << ccs811.get_tvoc() << "ppm";
         std::cout << "\tPres: " << std::fixed << std::setprecision(2) << bmp280.get_pressure() << "hPa";
         std::cout << std::endl;
 
