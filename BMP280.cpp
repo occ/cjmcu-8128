@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
+#undef DBG
+
 using namespace std;
 
 BMP280::BMP280(std::string i2c_dev_name, uint8_t ccs811_addr)
@@ -26,14 +28,17 @@ void BMP280::close_device() {
 }
 
 void BMP280::init() {
-    cout << "Resetting..." << endl;
+    cout << "Resetting BMP280..." << endl;
     reset();
-    this_thread::sleep_for(chrono::seconds(1));
+    this_thread::sleep_for(chrono::seconds(3));
 
     auto id = read_id();
     if (id != 0x58) {
         throw "Invalid device id!";
     }
+
+    cout << "Reading calibration data" << endl;
+    read_calibration_data();
 
     cout << "Setting the measurement control register" << endl;
     uint8_t temp_oversampling = 1; // x1 oversampling
@@ -86,11 +91,11 @@ std::unique_ptr<std::vector<uint8_t>> BMP280::read_registers(uint8_t start, size
     delete[] read_buffer;
 
 #ifdef DBG
-    std::cout << "Registers: ";
+    std::cerr << "\tRegisters: ";
     for (auto e : *result) {
-        std::cout << std::hex << (int) e << " ";
+        std::cerr << std::hex << (int) e << " ";
     }
-    std::cout << std::endl;
+    std::cerr << std::endl;
 #endif
 
     return result;
@@ -99,11 +104,10 @@ std::unique_ptr<std::vector<uint8_t>> BMP280::read_registers(uint8_t start, size
 
 void BMP280::write_data(uint8_t *buffer, size_t buffer_len) {
 #ifdef DBG
-    cout << "Write: ";
+    cerr << "\tWrite: ";
     for (size_t i = 0; i < buffer_len; i++) {
-        cout << "0x" << hex << (int) buffer[i] << " ";
+        cerr << "0x" << hex << (int) buffer[i] << " ";
     }
-    cout << endl;
 #endif
 
     auto write_c = write(i2c_fd, buffer, buffer_len);
@@ -113,7 +117,7 @@ void BMP280::write_data(uint8_t *buffer, size_t buffer_len) {
         throw 1;
     }
 #ifdef DBG
-    cout << "  ... wrote " << write_c << " bytes." << endl;
+    cerr << "  ... wrote " << write_c << " bytes." << endl;
 #endif
 }
 
@@ -131,6 +135,19 @@ void BMP280::read_calibration_data() {
     dig_P7 = (reg_data->at(19) << 8) | reg_data->at(18);
     dig_P8 = (reg_data->at(21) << 8) | reg_data->at(20);
     dig_P9 = (reg_data->at(23) << 8) | reg_data->at(22);
+
+    std::cout << dec << dig_T1 << endl;
+    std::cout << dec << dig_T2 << endl;
+    std::cout << dec << dig_T3 << endl;
+    std::cout << dec << dig_P1 << endl;
+    std::cout << "P2: " << dec << dig_P2 << endl;
+    std::cout << dec << dig_P3 << endl;
+    std::cout << dec << dig_P4 << endl;
+    std::cout << dec << dig_P5 << endl;
+    std::cout << dec << dig_P6 << endl;
+    std::cout << dec << dig_P7 << endl;
+    std::cout << dec << dig_P8 << endl;
+    std::cout << dec << dig_P9 << endl;
 }
 
 void BMP280::reset() {
@@ -155,16 +172,19 @@ void BMP280::measure() {
     uint8_t pressure_lsb = pressure_data->at(1);
     uint8_t pressure_xlsb = pressure_data->at(2);
 
-    // Dropping extra leas-significant bits because we didn't ask for oversampling.
-    uint32_t pressure_val = (pressure_msb << 8) | pressure_lsb;
+    uint32_t pressure_val = (pressure_msb << 12) | (pressure_lsb << 4) | (pressure_xlsb >> 4);
 
     auto temp_data = read_registers(0xfa, 3);
     uint8_t temp_msb = temp_data->at(0);
     uint8_t temp_lsb = temp_data->at(1);
     uint8_t temp_xlsb = temp_data->at(2);
 
-    // Same here. Dropping xlsbs.
-    uint32_t temp_val = (temp_msb << 8) | temp_lsb;
+    uint32_t temp_val = (temp_msb << 12) | (temp_lsb << 4) | (temp_xlsb >> 4);
+
+    cout << "Measured: P: " << dec << pressure_val << " T: " << dec << temp_val << endl;
+    pressure = compensate_pressure(pressure_val);
+    temperature = compensate_temp(temp_val);
+    cout << "Compensated: P: " << dec << pressure << " T: " << dec << temperature << endl;
 
     pressure = pressure_val;
     temperature = temp_val;
@@ -172,34 +192,35 @@ void BMP280::measure() {
 }
 
 // Compensation formulae are taken from the datasheet.
-// Returns temperature in DegC, resolution is 0.01 DegC. Output value of 5123 equals 51.23 DegC.
-uint32_t BMP280::compensate_temp(uint32_t temp) {
-    uint32_t var1, var2, T;
-    var1 = ((((temp >> 3) - ((uint32_t) dig_T1 << 1))) * ((uint32_t) dig_T2)) >> 11;
-    var2 = (((((temp >> 4) - ((uint32_t) dig_T1)) * ((temp >> 4) - ((uint32_t) dig_T1))) >> 12) * ((uint32_t) dig_T3))
-            >> 14;
-    t_fine = var1 + var2;
-    T = (t_fine * 5 + 128) >> 8;
-    return T;
+// Returns temperature in Celsuis, resolution is 0.01 DegC.
+double BMP280::compensate_temp(uint32_t adc_t) {
+    double var1 = (((double) adc_t) / 16384.0 - ((double) dig_T1) / 1024.0) * ((double) dig_T2);
+    double var2 = ((((double) adc_t) / 131072.0 - ((double) dig_T1) / 8192.0) *
+                   (((double) adc_t) / 131072.0 - ((double) dig_T1) / 8192.0)) * ((double) dig_T3);
+    t_fine = static_cast<int32_t>(var1 + var2);
+    return t_fine / 5120.0;
 }
 
 // Returns pressure in Pa as unsigned 32 bit integer in Q24.8 format (24 integer bits and 8 fractional bits).
 // Output value of 24674867 represents 24674867/256 = 96386.2 Pa = 963.862 hPa
-uint32_t BMP280::compensate_pressure(int32_t adc_P) {
-    int64_t var1, var2, p;
-    var1 = ((int64_t) t_fine) - 128000;
-    var2 = var1 * var1 * (int64_t) dig_P6;
-    var2 = var2 + ((var1 * (int64_t) dig_P5) << 17);
-    var2 = var2 + (((int64_t) dig_P4) << 35);
-    var1 = ((var1 * var1 * (int64_t) dig_P3) >> 8) + ((var1 * (int64_t) dig_P2) << 12);
-    var1 = (((((int64_t) 1) << 47) + var1)) * ((int64_t) dig_P1) >> 33;
-    if (var1 == 0) {
-        return 0; // avoid exception caused by division by zero
-    }
-    p = 1048576 - adc_P;
-    p = (((p << 31) - var2) * 3125) / var1;
-    var1 = (((int64_t) dig_P9) * (p >> 13) * (p >> 13)) >> 25;
-    var2 = (((int64_t) dig_P8) * p) >> 19;
-    p = ((p + var1 + var2) >> 8) + (((int64_t) dig_P7) << 4);
-    return (uint32_t) p;
+double BMP280::compensate_pressure(int32_t adc_p) {
+    double var1 = ((double)t_fine / 2.0) - 64000.0;
+    double var2 = var1 * var1 * ((double)dig_P6) / 32768.0;
+    var2 = var2 + var1 * ((double)dig_P5) * 2.0;
+    var2 = (var2 / 4.0) + (((double)dig_P4) * 65536.0);
+    var1 = (((double) dig_P3) * var1 * var1 / 524288.0 + ((double) dig_P2) * var1) / 524288.0;
+    var1 = (1.0 + var1 / 32768.0) * ((double)dig_P1);
+    double p = 1048576.0 - (double)adc_p;
+    p = (p - (var2 / 4096.0)) * 6250.0 / var1;
+    var1 = ((double) dig_P9) * p * p / 2147483648.0;
+    var2 = p * ((double) dig_P8) / 32768.0;
+    return (p + (var1 + var2 + ((double)dig_P7)) / 16.0) / 100;
+}
+
+double BMP280::get_temperature() {
+    return temperature;
+}
+
+double BMP280::get_pressure() {
+    return pressure;
 }

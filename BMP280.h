@@ -13,29 +13,34 @@ public:
 
     ~BMP280();
 
+    double get_pressure();
+
+    double get_temperature();
+
+    void measure();
+
 private:
     const std::string i2c_dev_name;
     const uint8_t ccs811_addr;
     int i2c_fd = -1;
     time_t last_measurement = 0;
-    uint32_t pressure, temperature;
+    double pressure;
+    double temperature;
 
     // Calibration values.
     uint16_t dig_T1, dig_P1;
     int16_t dig_T2, dig_T3, dig_P2, dig_P3, dig_P4, dig_P5, dig_P6, dig_P7, dig_P8, dig_P9;
 
     // State for the compensation formula
-    uint32_t t_fine;
+    int32_t t_fine;
 
-    uint32_t compensate_temp(uint32_t temp_val);
+    double compensate_temp(uint32_t temp_val);
 
-    uint32_t compensate_pressure(int32_t adc_P);
+    double compensate_pressure(int32_t adc_P);
 
     void close_device();
 
     void init();
-
-    void measure();
 
     void open_device();
 
