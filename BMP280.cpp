@@ -169,8 +169,6 @@ void BMP280::measure() {
     pressure = compensate_pressure(pressure_val);
     temperature = compensate_temp(temp_val);
 
-    pressure = pressure_val;
-    temperature = temp_val;
     last_measurement = time(nullptr);
 }
 
