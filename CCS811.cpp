@@ -26,38 +26,38 @@ uint16_t CCS811::get_tvoc() {
 }
 
 void CCS811::init() {
-    std::cout << "Checking the hardware id..." << std::endl;
+    std::cout << "[CCS811] hecking the hardware id..." << std::endl;
     auto hw_id = read_mailbox(HW_ID);
     if (hw_id->front() != 0x81) {
-        std::cerr << "Unrecognized hardware id 0x" << std::hex << (int) hw_id->front() << std::endl;
+        std::cerr << "[CCS811] Unrecognized hardware id 0x" << std::hex << (int) hw_id->front() << std::endl;
         exit(-1);
     }
 
-    std::cout << "Resetting CCS811..." << std::endl;
+    std::cout << "[CCS811] Resetting CCS811..." << std::endl;
     uint8_t reset_sequence[] = {0x11, 0xe5, 0x72, 0x8a};
     write_to_mailbox(SW_RESET, reset_sequence, 4);
 
-    std::cout << "Sleeping for a second..." << std::endl;
+    std::cout << "[CCS811] Sleeping for a second..." << std::endl;
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     auto hw_version = read_mailbox(HW_VERSION);
     char version_str[15];
     version_to_str(hw_version->front(), version_str);
-    std::cout << "HW Version: " << version_str << std::endl;
+    std::cout << "[CCS811] HW Version: " << version_str << std::endl;
 
     auto fw_boot_ver = read_mailbox(FW_BOOT_VERSION);
     version_to_str(fw_boot_ver->front(), version_str);
-    std::cout << "FW Boot Version: " << version_str << "." << (int) fw_boot_ver->at(1) << std::endl;
+    std::cout << "[CCS811] FW Boot Version: " << version_str << "." << (int) fw_boot_ver->at(1) << std::endl;
 
     auto fw_app_ver = read_mailbox(FW_APP_VERSION);
     version_to_str(fw_app_ver->front(), version_str);
-    std::cout << "FW Application Version: " << version_str << "." << (int) fw_app_ver->at(1) << std::endl;
+    std::cout << "[CCS811] FW Application Version: " << version_str << "." << (int) fw_app_ver->at(1) << std::endl;
 
-    std::cout << "Starting..." << std::endl;
+    std::cout << "[CCS811] Starting..." << std::endl;
     uint8_t buffer[] = {APP_START};
     write_data(buffer, 1);
 
-    std::cout << "Configuring measurement mode to Mode 1 - Constant power mode, IAQ measurement every second"
+    std::cout << "[CCS811] Configuring measurement mode to Mode 1 - Constant power mode, measuring every 1 sec."
               << std::endl;
     uint8_t measurement_mode[] = {1 << 4};
     write_to_mailbox(MEAS_MODE, measurement_mode, 1);
@@ -123,9 +123,35 @@ void CCS811::read_sensors() {
         std::cerr << "Device isn't ready yet." << std::endl;
         return;
     }
+
+    if ((status->front() & 1) != 0) {
+        auto error_register = read_mailbox(ERROR_ID);
+        std::cerr << "[CCS811] Error detected. Error register: " << std::hex << error_register->front() << std::endl;
+        return;
+    }
+
     auto data = read_mailbox(ALG_RESULT_DATA);
-    co2 = (data->at(0) << 8 | data->at(1));
-    tvoc = (data->at(2) << 8 | data->at(3));
+    int status_byte = data->at(4);
+    int err_byte = data->at(5);
+
+    if (status_byte != 0x98) {
+        std::cerr << "[CCS811] Sensor wasn't ready. Not updatingmeasurements." << std::endl;
+        return;
+    }
+
+    if (err_byte != 0) {
+        std::cerr << "[CCS811] Error occurred while taking measurements. ERROR_ID: 0x" << std::hex << err_byte
+                  << std::endl;
+        return;
+    }
+
+    co2 = (data->at(0) << 8) | data->at(1);
+    tvoc = (data->at(2) << 8) | data->at(3);
+
+    // Mask out the 16th bit from measurements. Sensor can randomly set values with the 16th bit set.
+    co2 &= ~(1 << 15);
+    tvoc &= ~(1 << 15);
+
     last_measurement = time(nullptr);
 }
 
