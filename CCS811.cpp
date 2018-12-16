@@ -198,3 +198,12 @@ int CCS811::version_to_str(uint8_t version, char *buffer) {
     int minor = version & 0xF;
     return sprintf(buffer, "%d.%d", major, minor);
 }
+
+void CCS811::set_env_data(double rel_humidity, double temperature) {
+    auto rh_data = static_cast<uint16_t>(rel_humidity * 512);
+    auto temp_data = static_cast<uint16_t>((temperature + 25) * 512);
+    uint8_t env_data[] = {static_cast<uint8_t>(rh_data >> 8), static_cast<uint8_t>(rh_data & 0xFF),
+                          static_cast<uint8_t>(temp_data >> 8), static_cast<uint8_t>(temp_data & 0xFF)};
+    write_to_mailbox(ENV_DATA, env_data, 4);
+}
+

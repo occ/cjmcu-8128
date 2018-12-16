@@ -24,6 +24,8 @@ public:
 
     uint16_t get_tvoc();
 
+    void set_env_data(double rel_humidity, double temperature);
+
     struct MailboxInfo {
         uint8_t id;
         size_t size;
